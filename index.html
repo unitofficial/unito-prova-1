@@ -9,18 +9,38 @@
     <!-- MindAR per A-Frame -->
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     <style>
-      body {
+      html, body {
         margin: 0;
         overflow: hidden;
+        height: 100%;
       }
       /* Make the AR scene fill the viewport */
       a-scene {
         width: 100vw;
         height: 100vh;
+        display: block;
       }
-      /* Style for the capture button */
-      #capture {
+      /* Ensure the AR scene's elements stay in their stacking context */
+      a-scene video {
         position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 0;
+      }
+      a-scene canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+      }
+      /* Style for the capture button:
+         Use fixed positioning so it always appears on top,
+         with a high z-index to ensure it’s clickable */
+      #capture {
+        position: fixed;
         bottom: 20px;
         left: 50%;
         transform: translateX(-50%);
@@ -33,7 +53,8 @@
         border-radius: 50%;
         border: none;
         cursor: pointer;
-        z-index: 1000;
+        z-index: 9999;
+        pointer-events: auto;
       }
       #capture:active {
         transform: translateX(-50%) scale(0.9);
@@ -70,43 +91,37 @@
     <button id="capture"></button>
     
     <script>
-      // Wait until the scene starts rendering.
       const scene = document.querySelector('a-scene');
-      scene.addEventListener('renderstart', () => {
-        console.log("Scene started rendering.");
-      });
-      
-      // Composite screenshot: draws the camera feed video and the AR overlay
+
+      // Composite screenshot: draws the camera feed and AR overlay
       function takeCompositeScreenshot() {
-        // Get the renderer's WebGL canvas.
+        // Get the renderer's canvas from A-Frame.
         const rendererCanvas = scene.renderer.domElement;
         // MindAR creates a video element inside the <a-scene>.
         const videoElement = document.querySelector('a-scene video');
         
-        // Use the current viewport dimensions (which should match the display).
+        // Use viewport dimensions.
         const width = window.innerWidth;
         const height = window.innerHeight;
         
-        // Create an offscreen canvas to compose the final image.
+        // Create an offscreen canvas.
         const compositeCanvas = document.createElement('canvas');
         compositeCanvas.width = width;
         compositeCanvas.height = height;
         const ctx = compositeCanvas.getContext('2d');
         
-        // Draw the camera feed first (if the video element is available and ready).
+        // Draw the camera feed (if ready).
         if (videoElement && videoElement.readyState >= 2) {
           ctx.drawImage(videoElement, 0, 0, width, height);
         } else {
           console.warn("Video element not ready, skipping background.");
         }
         
-        // Then draw the AR overlay from the renderer's canvas.
+        // Draw the AR overlay.
         ctx.drawImage(rendererCanvas, 0, 0, width, height);
         
-        // Convert the composite canvas to a PNG data URL.
+        // Create a download link for the composite image.
         const dataURL = compositeCanvas.toDataURL("image/png");
-        
-        // Create a temporary download link, trigger the download, and then remove the link.
         const link = document.createElement("a");
         link.download = "screenshot.png";
         link.href = dataURL;
@@ -115,7 +130,7 @@
         document.body.removeChild(link);
       }
       
-      // Add an event listener to the capture button.
+      // When the capture button is clicked, take the screenshot.
       const captureButton = document.getElementById('capture');
       captureButton.addEventListener('click', (event) => {
         event.preventDefault();
