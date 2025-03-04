@@ -3,24 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AR Composite Screenshot</title>
+    <title>AR Screenshot with html2canvas</title>
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <!-- MindAR per A-Frame -->
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <!-- html2canvas library -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <style>
       html, body {
         margin: 0;
         overflow: hidden;
         height: 100%;
       }
-      /* Make sure the scene fills the screen */
+      /* The AR scene fills the entire viewport */
       a-scene {
         width: 100vw;
         height: 100vh;
         display: block;
       }
-      /* Ensure the video (camera feed) stays behind the AR overlay */
+      /* The video (camera feed) appears behind the AR overlay */
       a-scene video {
         position: absolute;
         top: 0;
@@ -30,7 +32,7 @@
         object-fit: cover;
         z-index: 0;
       }
-      /* The WebGL canvas from A-Frame (AR overlay) stays above the video */
+      /* The WebGL canvas (AR overlay) appears above the video */
       a-scene canvas {
         position: absolute;
         top: 0;
@@ -60,100 +62,57 @@
     </style>
   </head>
   <body>
-    <!-- AR Scene using MindAR and A-Frame. Note the "screenshot" attribute -->
+    <!-- AR Scene using MindAR and A-Frame -->
     <a-scene 
       mindar-image="imageTargetSrc: marker.mind; stabilizationThreshold: 0.1;" 
-      screenshot
-      renderer="colorManagement: true, physicallyCorrectLights, preserveDrawingBuffer: true, alpha: true" 
-      vr-mode-ui="enabled: false" 
+      renderer="colorManagement: true, physicallyCorrectLights, preserveDrawingBuffer: true, alpha: true"
+      vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false">
       
       <a-assets>
-        <!-- 3D model asset -->
+        <!-- 3D Model asset -->
         <a-asset-item id="avatarModel" src="modello.glb"></a-asset-item>
       </a-assets>
       
       <a-light type="ambient" intensity="1"></a-light>
       <a-camera id="camera" position="0 0 0" look-controls="enabled: false"></a-camera>
       
-      <!-- AR target: shows the 3D model when marker is detected -->
+      <!-- AR target: when the marker is detected, the 3D model is shown -->
       <a-entity mindar-image-target="targetIndex: 0">
-        <a-gltf-model src="#avatarModel" 
-                      position="0 0.4 0.1" 
-                      scale="0.01 0.01 0.01" 
+        <a-gltf-model src="#avatarModel"
+                      position="0 0.4 0.1"
+                      scale="0.01 0.01 0.01"
                       rotation="0 180 0">
         </a-gltf-model>
       </a-entity>
     </a-scene>
     
-    <!-- Capture button -->
+    <!-- Capture Button -->
     <button id="capture"></button>
     
     <script>
-      const scene = document.querySelector('a-scene');
-
-      // Wait until the scene is fully rendering.
-      scene.addEventListener('renderstart', () => {
-        console.log("Scene rendered and ready.");
-      });
-      
-      // Composite screenshot function:
-      // 1. Retrieve the AR overlay canvas via the screenshot component.
-      // 2. Find the video element (MindAR's camera feed).
-      // 3. Create an offscreen canvas using viewport dimensions.
-      // 4. Draw the video feed first and then overlay the AR canvas.
-      // 5. Convert the composite to an image and trigger a download.
-      function takeCompositeScreenshot() {
-        const screenshotComponent = scene.components.screenshot;
-        if (!screenshotComponent) {
-          console.warn("Screenshot component not available.");
-          return;
-        }
-        
-        // Get the AR overlay canvas (the WebGL content)
-        const arCanvas = screenshotComponent.getCanvas('perspective');
-        // Get the camera feed video element (created by MindAR)
-        const videoElement = document.querySelector('a-scene video');
-        
-        // Use viewport dimensions for the final composite
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        const compositeCanvas = document.createElement('canvas');
-        compositeCanvas.width = width;
-        compositeCanvas.height = height;
-        const ctx = compositeCanvas.getContext('2d');
-        
-        // Draw the video feed first (if ready)
-        if (videoElement && videoElement.readyState >= 2) {
-          ctx.drawImage(videoElement, 0, 0, width, height);
-        } else {
-          console.warn("Video element not ready; background skipped.");
-        }
-        
-        // Draw the AR overlay on top
-        if (arCanvas) {
-          ctx.drawImage(arCanvas, 0, 0, width, height);
-        } else {
-          console.warn("AR overlay canvas not available.");
-        }
-        
-        // Convert composite canvas to a PNG data URL
-        const dataURL = compositeCanvas.toDataURL("image/png");
-        // Create a temporary link to trigger download
-        const link = document.createElement("a");
-        link.download = "screenshot.png";
-        link.href = dataURL;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-      
-      // Bind the composite screenshot to the capture button
       const captureButton = document.getElementById('capture');
-      captureButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        // Optionally, wait a short moment for the latest frame to render
-        setTimeout(takeCompositeScreenshot, 100);
+
+      captureButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        // Hide the capture button so it doesn't appear in the screenshot
+        captureButton.style.display = 'none';
+        // Use html2canvas to capture the entire body (the AR scene with camera feed and overlay)
+        html2canvas(document.body, { useCORS: true }).then(function(canvas) {
+          // Show the capture button again after capturing
+          captureButton.style.display = 'block';
+          const dataURL = canvas.toDataURL("image/png");
+          // Create a temporary link and trigger the download
+          const link = document.createElement("a");
+          link.download = "screenshot.png";
+          link.href = dataURL;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }).catch(function(error) {
+          console.error("Error capturing screenshot:", error);
+          captureButton.style.display = 'block';
+        });
       });
     </script>
   </body>
